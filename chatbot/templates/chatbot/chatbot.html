@@ -1,0 +1,269 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block styles %}
+<style>
+  body,
+  html {
+    height: 100%;
+  }
+
+  .messages-box {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .messages-list {
+    padding-left: 0;
+  }
+
+  .message {
+    margin-bottom: 15px;
+    list-style: none;
+  }
+
+  .message-text {
+    padding: 10px;
+    border-radius: 5px;
+  }
+
+  .sent {
+    background-color: #dcf8c6;
+    align-self: flex-end;
+  }
+
+  .received {
+    background-color: #f1f0f0;
+    align-self: flex-start;
+  }
+
+  .message-form {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+  }
+
+  .message-input {
+    flex: 1;
+    border-radius: 0;
+    border-right: none;
+  }
+
+  .btn-send {
+    border-radius: 0;
+  }
+
+  .chat-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h5 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: row-reverse;
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="chat-container">
+  <div class="card flex-grow-1">
+    <div class="card-header bg-primary text-white">Chat</div>
+    <div class="card-header bg-primary text-white">
+      {% if user.is_authenticated %}
+      <b>Welcome, {{user.username}}</b>
+      <a style="color: yellow;" href="logout">Logout</a>
+      {% else %}
+      <a style="color: yellow;" href="login">Login</a>
+      <a style="color: yellow;" href="register">Register</a>
+      {% endif %}
+      <!-- Example single danger button -->
+      <div class="btn-group">
+        <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"
+          aria-expanded="false" id="language">
+          {{selected_lang}}
+        </button>
+        <div class="dropdown-menu">
+          {% for language in languages %}
+          <a class="dropdown-item" id="{{forloop.counter}}" onclick="lang_sel(this)">{{language}}</a>
+          {% endfor %}
+          <!-- <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="#">Separated link</a> -->
+        </div>
+      </div>
+      <a href="{% url 'loc_services' %}">
+        <button type="button" class="btn btn-info " id="POI">
+          PlacesOfInterest
+        </button>
+      </a>
+    </div>
+    <div class="card-body messages-box">
+
+      <ul class="list-unstyled messages-list">
+
+        <!-- <li class="message received">
+          <div class="message-text">
+            <div class="message-sender">
+              <b>ChatFIS</b>
+            </div>
+            <div class="message-content">
+              Hi {{user.username}}, I am your AI Chatbot, you can ask me anything.
+            </div>
+          </div>
+        </li> -->
+
+
+        {% for chat in chats %}
+        {% if chat.user == request.user %}
+
+
+        <li class="message sent">
+          <div class="message-text">
+            <div class="message-sender">
+              <b>You</b>
+            </div>
+            <div class="message-content">
+              {{chat.message}}
+            </div>
+          </div>
+        </li>
+
+        <li class="message received">
+          <div class="message-text">
+            <div class="message-sender">
+              <b>ChatFIS</b>
+            </div>
+            <div class="message-content">
+              {{chat.response}}
+            </div>
+          </div>
+        </li>
+
+        {% endif %}
+        {% endfor %}
+
+      </ul>
+
+    </div>
+    <br><br>
+    <br><br>
+    <br><br>
+  </div>
+  <form class="message-form">
+    {%csrf_token%}
+    <div class="input-group">
+      <input type="text" class="form-control message-input" placeholder="Type your message...">
+      <div class="input-group-append">
+        <button type="submit" class="btn btn-primary btn-send">Send</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  const messagesList = document.querySelector('.messages-list');
+  const messageForm = document.querySelector('.message-form');
+  const messageInput = document.querySelector('.message-input');
+
+  messageForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const message = messageInput.value.trim();
+    if (message.length === 0) {
+      return;
+    }
+
+    const messageItem = document.createElement('li');
+    messageItem.classList.add('message', 'sent');
+    messageItem.innerHTML = `
+      <div class="message-text">
+        <div class="message-sender">
+          <b>You</b>
+        </div>
+        <div class="message-content">
+          ${message}
+        </div>
+      </div>`;
+    messagesList.appendChild(messageItem);
+
+    messageInput.value = '';
+
+    const messageItem2 = document.createElement('li');
+    messageItem2.classList.add('message', 'received');
+    messageItem2.innerHTML = `
+      <div class="message-text">
+        <div class="message-sender">
+          <b>AI Chatbot</b>
+        </div>
+        <div class="message-content">
+          <img src="{% static 'loading.gif' %}" width="50"/>
+        </div>
+      </div>`;
+    messagesList.appendChild(messageItem2);
+
+    messageInput.value = '';
+    let textDecoder = new TextDecoder('utf-8')
+
+    fetch('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        'csrfmiddlewaretoken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        'message': message
+      })
+    })
+      .then(async (response) => {
+        reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+        while (true) {
+          let { value, done } = await reader.read()
+          if (done) break
+          value = value.substr(16, value.length - 35)
+          ele = messageItem2.querySelector('.message-text').querySelector('.message-content')
+          ele.innerHTML = value
+        }
+      });
+  });
+
+</script>
+<script>
+  function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        // Does this cookie string begin with the name we want?
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  async function lang_sel(obj) {
+    let language = obj.innerHTML
+    let csrftoken = getCookie('csrftoken');
+
+    response = await fetch("{% url 'lang_change' %}", {
+      method: "POST",
+      body: JSON.stringify({ language }),
+      headers: {
+        "Content-type": "application/json; charset=UTF-8",
+        "X-CSRFToken": csrftoken
+      }
+    }
+    )
+    data = await response.json()
+    document.querySelector("#language").innerHTML = data.changed_language
+  }
+</script>
+{% endblock %}

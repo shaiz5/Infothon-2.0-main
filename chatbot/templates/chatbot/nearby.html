@@ -1,0 +1,245 @@
+{% extends 'chatbot/base.html' %}
+{% load static %}
+
+{% block styles %}
+<style>
+    body,
+    html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    #map {
+        height: 100%;
+    }
+
+    .messages-box {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .messages-list {
+        padding-left: 0;
+    }
+
+    .message {
+        margin-bottom: 15px;
+        list-style: none;
+    }
+
+    .message-text {
+        padding: 10px;
+        border-radius: 5px;
+    }
+
+    .sent {
+        background-color: #dcf8c6;
+        align-self: flex-end;
+    }
+
+    .received {
+        background-color: #f1f0f0;
+        align-self: flex-start;
+    }
+
+    .message-form {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px;
+        background-color: #f8f9fa;
+    }
+
+    .message-input {
+        flex: 1;
+        border-radius: 0;
+        border-right: none;
+    }
+
+    .btn-send {
+        border-radius: 0;
+    }
+
+    .chat-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    h5 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-direction: row-reverse;
+    }
+</style>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+{% endblock %}
+
+
+{% block content %}
+<button id="modaltrigger" type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal"
+    hidden></button>
+<div class="modal fade" id="exampleModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+    aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle"></h5>
+            </div>
+            <div class="modal-body">
+                <ul class="dropdown-menu" style="display: contents;cursor: pointer;">
+                    <li><a class="dropdown-item" onclick="get_data(this.innerHTML)"
+                            data-bs-dismiss="modal">Restauraunts</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="chat-container">
+    <div class="card flex-grow-1">
+        <div class="card-header bg-primary text-white">Chat</div>
+        <div class="card-header bg-primary text-white">
+            {% if user.is_authenticated %}
+            <b>Welcome, {{user.username}}</b>
+            <a style="color: yellow;" href="logout">Logout</a>
+            {% else %}
+            <a style="color: yellow;" href="login">Login</a>
+            <a style="color: yellow;" href="register">Register</a>
+            {% endif %}
+            <!-- Example single danger button -->
+            <div class="btn-group">
+                <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"
+                    aria-expanded="false" id="language">
+                    {{selected_lang}}
+                </button>
+                <div class="dropdown-menu">
+                    {% for language in languages %}
+                    <a class="dropdown-item" id="{{forloop.counter}}" onclick="lang_sel(this)">{{language}}</a>
+                    {% endfor %}
+                    <!-- <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="#">Separated link</a> -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="accordion" id="accordion"></div>
+    <!-- prettier-ignore-attribute (mouseup) -->
+    <script>(g => { var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window; b = b[c] || (b[c] = {}); var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams, u = () => h || (h = new Promise(async (f, n) => { await (a = m.createElement("script")); e.set("libraries", [...r] + ""); for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]); e.set("callback", c + ".maps." + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e; d[q] = f; a.onerror = () => h = n(Error(p + " could not load.")); a.nonce = m.querySelector("script[nonce]")?.nonce || ""; m.head.append(a) })); d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)) })
+            ({ key: "Your_Maps_JavaScript_API", v: "weekly" });</script>
+    <script>
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        async function lang_sel(obj) {
+            let language = obj.innerHTML
+            let csrftoken = getCookie('csrftoken');
+
+            response = await fetch("{% url 'lang_change' %}", {
+                method: "POST",
+                body: JSON.stringify({ language }),
+                headers: {
+                    "Content-type": "application/json; charset=UTF-8",
+                    "X-CSRFToken": csrftoken
+                }
+            }
+            )
+            data = await response.json()
+            document.querySelector("#language").innerHTML = data.changed_language
+        }
+        var call = function () { };
+
+        async function get_data(query) {
+            let csrftoken = getCookie('csrftoken');
+            response = await fetch("{% url 'loc_services' %}", {
+                method: "POST",
+                body: JSON.stringify({ query }),
+                headers: {
+                    "Content-type": "application/json; charset=UTF-8",
+                    "X-CSRFToken": csrftoken
+                }
+            }
+            )
+            data = await response.json()
+
+            for (let i = 0; i < data.results.length; i++) {
+                const place = data.results[i];
+                accordion = document.querySelector("#accordion")
+
+                let acc_item = document.createElement('div')
+                acc_item.classList.add('accordion-item')
+
+                let header = document.createElement('h2')
+                header.classList.add("accordion-header")
+
+                let button = document.createElement('button')
+                button.classList.add('accordion-button', 'collapsed')
+                button.setAttribute('type', 'button')
+                button.setAttribute('data-bs-toggle', 'collapse')
+                button.setAttribute('data-bs-target', '#collapse' + i.toString())
+                button.setAttribute('aria-expanded', 'false')
+                button.setAttribute('aria-controls', 'collapse' + i.toString())
+                button.innerHTML = place.name
+
+                let collapse = document.createElement('div')
+                collapse.classList.add('accordion-collapse', 'collapse')
+                collapse.setAttribute('id', 'collapse' + i.toString())
+                collapse.setAttribute('data-bs-parent', '#accordion')
+
+                let body = document.createElement('div')
+                body.classList.add('accordion-body')
+                let map_holder = document.createElement('div')
+                map_holder.setAttribute('id', 'map' + i.toString())
+                body.appendChild(map_holder)
+
+                call = async function () {
+                    const name = place.name
+                    const position = place.geometry.location;
+                    const { Map } = await google.maps.importLibrary("maps");
+                    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+                    let map = new Map(document.getElementById('map' + i.toString()), {
+                        zoom: 4,
+                        center: position,
+                        mapId: "map" + i.toString(),
+                    });
+                    const marker = new AdvancedMarkerElement({
+                        map: map,
+                        position: position,
+                        title: name,
+                    });
+                }
+
+                button.addEventListener('click', call)
+
+                header.appendChild(button)
+                collapse.appendChild(body)
+                acc_item.appendChild(header)
+                acc_item.appendChild(collapse)
+                accordion.appendChild(acc_item)
+
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", (event) => {
+            titles = { 'English': 'What are you looking for?' }
+            document.querySelector('#modalTitle').innerHTML = titles['{{ selected_lang }}']
+            document.querySelector('#modaltrigger').click()
+        })
+    </script>
+    {% endblock %}
