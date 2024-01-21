@@ -1,4 +1,4 @@
-# Django Chatbot
+# ChatFIS (Chat For India's Service)
 
 This is a chatbot project implemented using Django.
 
