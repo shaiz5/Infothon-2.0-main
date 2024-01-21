@@ -21,9 +21,3 @@ The project is structured as follows:
 - `requirements.txt`: This file contains the list of dependencies for the project.
 - `db.sqlite3`: This is the SQLite database file.
 
-## Setup
-
-1. Install the required dependencies:
-
-```sh
-pip install -r requirements.txt
